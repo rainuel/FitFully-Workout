@@ -1,0 +1,20 @@
+{
+  "appId": "com.fitfully.app",
+  "appName": "Fit Fully",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#0f1e1d"
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": false
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DARK"
+    },
+    "LocalNotifications": {
+      "iconColor": "#f1c232"
+    }
+  }
+}

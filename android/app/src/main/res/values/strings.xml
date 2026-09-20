@@ -1,3 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">FitFully</string>
+    <string name="app_name">Fit Fully</string>
+    <string name="title_activity_main">Fit Fully</string>
+    <string name="package_name">com.fitfully.app</string>
+    <string name="custom_url_scheme">com.fitfully.app</string>
 </resources>
