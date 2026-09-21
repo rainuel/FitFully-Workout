@@ -230,3 +230,13 @@ test('an exercise removed from the program can no longer be committed', async ()
   assert.equal((await commitProgression(db, exId)).ok, false);
   assert.equal((await loadExerciseScreen(db, exId)).progression.canCommit, false);
 });
+
+test('evaluateProgression exposes each set and the rep range when the top was not reached', () => {
+  const r = evaluateProgression({
+    sets: [set({ weight: 30, reps: 8 }), set({ weight: 30, reps: 12 }), set({ weight: 25, reps: 7 })],
+    increment: 5,
+  });
+  assert.equal(r.state, 'not_reached');
+  assert.deepEqual(r.sets.map((s) => [s.weight, s.reps]), [[30, 8], [30, 12], [25, 7]]);
+  assert.equal(r.targetRepMax, 12);
+});

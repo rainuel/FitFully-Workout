@@ -1,13 +1,15 @@
 import { h, pluralize } from '../utils/dom.js';
 import { formatLongDate } from '../utils/dates.js';
-import { loadWeek } from '../services/schedule-service.js';
+import { loadHomeConsistency } from '../services/streak-service.js';
 import { getActiveSession } from '../services/workout-service.js';
 import { weekStrip } from '../components/week-strip.js';
 import { restDayPanel } from '../components/rest-day.js';
+import { streakCard } from '../components/streak-card.js';
+import { announceAchievements } from '../components/achievement-toast.js';
 
 export async function renderHome(root, { db }) {
   const now = new Date();
-  const { week, today } = await loadWeek(db, now);
+  const { days, today, message, completed, scheduled } = await loadHomeConsistency(db, now);
   const active = await getActiveSession(db);
 
   let subline;
@@ -27,6 +29,10 @@ export async function renderHome(root, { db }) {
     today.isRest && !active
       ? restDayPanel()
       : h('a', { class: 'btn btn--primary btn--block', href: '#/workout' }, active ? 'Continue workout' : 'Open today’s workout'),
-    weekStrip(week),
+    streakCard(message),
+    weekStrip(days, { completed, scheduled }),
   );
+
+  // Catches anything reached since the last look (for example a finished 4-week run).
+  await announceAchievements(db);
 }

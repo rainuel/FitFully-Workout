@@ -35,7 +35,9 @@ export function nextWeight(liftedWeight, increment) {
  *   eligible        every set was done at the top of its range
  *
  * Only completed working sets are examined; warm-ups are ignored.
- * Returns { state, totalSets, doneSets, liftedWeight, suggestedWeight }.
+ * Returns { state, totalSets, doneSets, liftedWeight, suggestedWeight }, plus, once every set is
+ * done, `sets` ([{ weight, reps, targetWeight }] in order) and the rep range `targetRepMin` /
+ * `targetRepMax`, so the UI can explain how each set went.
  */
 export function evaluateProgression({ sets, increment }) {
   const working = sets.filter((s) => s.kind === 'working');
@@ -50,7 +52,13 @@ export function evaluateProgression({ sets, increment }) {
     return { ...base, state: 'not_applicable' };
   }
 
-  const result = { ...base, liftedWeight: lifted };
+  const result = {
+    ...base,
+    liftedWeight: lifted,
+    sets: done.map((s) => ({ weight: Number(s.weight), reps: s.reps, targetWeight: Number(s.targetWeight ?? 0) })),
+    targetRepMin: Math.min(...done.map((s) => (Number.isInteger(s.targetRepMin) ? s.targetRepMin : s.targetRepMax))),
+    targetRepMax: Math.max(...done.map((s) => s.targetRepMax)),
+  };
   if (done.every(hitTopOfRange)) {
     return { ...result, state: 'eligible', suggestedWeight: nextWeight(lifted, increment) };
   }

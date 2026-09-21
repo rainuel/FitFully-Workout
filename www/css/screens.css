@@ -552,6 +552,27 @@ a.wk-row:active {
   font-weight: 800;
 }
 
+.progress-card__sets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress-card__sets li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-card__tip {
+  color: var(--text-dim);
+}
+
 .progress-card__actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
