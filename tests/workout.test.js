@@ -7,6 +7,8 @@ import { addExerciseToDay, removeProgramExercise, saveProgramExercise } from '..
 import {
   addSet,
   adjustRest,
+  getExerciseBreakSeconds,
+  saveExerciseBreakSeconds,
   completeSet,
   finishWorkout,
   loadExerciseScreen,
@@ -183,7 +185,7 @@ test('completing a working set saves it and starts the exercise’s rest', async
   const at = MONDAY + 5 * MIN;
 
   const res = await completeSet(db, working(bench)[0].id, { weight: 105, reps: 9 }, at);
-  assert.deepEqual(res, { ok: true, restStarted: true, exerciseCompleted: false, workoutComplete: false });
+  assert.deepEqual(res, { ok: true, restStarted: true, breakSeconds: 0, exerciseCompleted: false, workoutComplete: false });
 
   const set = await W.getSet(db, working(bench)[0].id);
   assert.deepEqual([set.completed, set.weight, set.reps, set.completedAt], [true, 105, 9, new Date(at).toISOString()]);
@@ -502,4 +504,60 @@ test('validateSetEntry and describeTargets', () => {
   const ex = (mins) => ({ sets: mins.map(([min, max]) => ({ kind: 'working', targetRepMin: min, targetRepMax: max })) });
   assert.equal(describeTargets(ex([[8, 12], [8, 12], [8, 12]])), '3 × 8–12');
   assert.equal(describeTargets(ex([[12, 12], [10, 10], [8, 8]])), '12 · 10 · 8');
+});
+
+// ---- Break between exercises ------------------------------------------------------
+
+async function finishBench(db, bench, at) {
+  const sets = working(bench);
+  await completeSet(db, sets[0].id, { weight: 100, reps: 10 }, at);
+  await completeSet(db, sets[1].id, { weight: 100, reps: 10 }, at);
+  return completeSet(db, sets[2].id, { weight: 100, reps: 10 }, at);
+}
+
+test('finishing every set of an exercise starts a 5 minute break by default', async () => {
+  const db = await setup();
+  await planMonday(db);
+  const { sessionId, bench } = await startMonday(db);
+  const at = MONDAY + 5 * MIN;
+  const res = await finishBench(db, bench, at);
+  assert.equal(res.exerciseCompleted, true);
+  assert.equal(res.breakSeconds, 300);
+  assert.equal((await W.getSession(db, sessionId)).restEndsAt, at + 5 * MIN);
+});
+
+test('the break can be 10 minutes or turned off, and bad values are refused', async () => {
+  const db = await setup();
+  assert.equal(await getExerciseBreakSeconds(db), 300);
+  assert.equal((await saveExerciseBreakSeconds(db, 7)).ok, false);
+  assert.equal((await saveExerciseBreakSeconds(db, 600)).ok, true);
+
+  await planMonday(db);
+  const { sessionId, bench } = await startMonday(db);
+  const at = MONDAY + 5 * MIN;
+  await finishBench(db, bench, at);
+  assert.equal((await W.getSession(db, sessionId)).restEndsAt, at + 10 * MIN);
+
+  await saveExerciseBreakSeconds(db, 0);
+  const db2 = await setup();
+  await saveExerciseBreakSeconds(db2, 0);
+  await planMonday(db2);
+  const second = await startMonday(db2);
+  const res = await finishBench(db2, second.bench, at);
+  assert.equal(res.breakSeconds, 0);
+  assert.equal((await W.getSession(db2, second.sessionId)).restEndsAt, at + 120 * 1000); // the normal 2:00 rest
+});
+
+test('no break is started after the last exercise of the workout', async () => {
+  const db = await setup();
+  await planMonday(db);
+  const { sessionId, bench, ohp } = await startMonday(db);
+  const at = MONDAY + 5 * MIN;
+  await finishBench(db, bench, at);
+  const sets = working(ohp);
+  await completeSet(db, sets[0].id, { weight: 60, reps: 10 }, at);
+  const res = await completeSet(db, sets[1].id, { weight: 60, reps: 10 }, at);
+  assert.equal(res.workoutComplete, true);
+  assert.equal(res.breakSeconds, 0);
+  assert.equal((await W.getSession(db, sessionId)).restEndsAt, null);
 });

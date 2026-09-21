@@ -3,6 +3,8 @@ import { formatFullDate, toLocalDateString } from '../utils/dates.js';
 import { APP_VERSION } from '../utils/app-info.js';
 import { formatWeight } from '../utils/format.js';
 import { saveWeightIncrement } from '../services/progression-service.js';
+import { getExerciseBreakSeconds, saveExerciseBreakSeconds } from '../services/workout-service.js';
+import { BREAK_OPTIONS } from '../services/workout-rules.js';
 import { INCREMENT_PRESETS, MAX_INCREMENT } from '../services/progression-rules.js';
 import {
   loadProfile,
@@ -217,6 +219,32 @@ function unitsPanel(data, refresh) {
   );
 }
 
+// ---- Break between exercises -----------------------------------------------------
+
+function breakPanel(data, refresh) {
+  const { db, exerciseBreak } = data;
+  return h(
+    'section',
+    { class: 'panel panel--form', 'aria-labelledby': 'break-heading' },
+    h('h2', { class: 'section-title', id: 'break-heading' }, 'Workout breaks'),
+    field(
+      'Break after each exercise',
+      segmented({
+        label: 'Break after each exercise',
+        options: BREAK_OPTIONS.map((o) => ({ value: o.seconds, label: o.label })),
+        value: exerciseBreak,
+        onChange: async (seconds) => {
+          const r = await saveExerciseBreakSeconds(db, seconds);
+          if (!r.ok) return showToast(r.errors[0]);
+          showToast(seconds === 0 ? 'Exercise breaks are off' : `Break after each exercise: ${seconds / 60} min`);
+          await refresh();
+        },
+      }),
+      'When you finish every set of an exercise, the rest timer starts this longer break before the next one. You can still adjust or skip it.',
+    ),
+  );
+}
+
 // ---- About ----------------------------------------------------------------------
 
 function aboutPanel() {
@@ -231,13 +259,14 @@ function aboutPanel() {
 
 export async function renderProfile(root, { db }) {
   async function draw() {
-    const data = { ...(await loadProfile(db)), db };
+    const data = { ...(await loadProfile(db)), db, exerciseBreak: await getExerciseBreakSeconds(db) };
     root.replaceChildren(
       h('h1', { class: 'screen-title' }, 'Profile'),
       bodyweightPanel(data, draw),
       heightPanel(data, draw),
       bmiPanel(data),
       unitsPanel(data, draw),
+      breakPanel(data, draw),
       aboutPanel(),
     );
   }

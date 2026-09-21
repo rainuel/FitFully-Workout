@@ -154,7 +154,7 @@ export async function renderWorkout(root, { db }) {
         todayCard(data.today, pluralize(data.plan.length, 'exercise')),
         h(
           'ul',
-          { class: 'ex-list' },
+          { class: 'ex-list ex-list--grouped' },
           ...data.plan.map((pe) =>
             h('li', null, h('div', { class: 'ex-list__item' }, h('span', { class: 'ex-list__body' }, h('span', { class: 'ex-list__name' }, pe.name), h('span', { class: 'ex-list__meta' }, `${summarizeSets(pe.workingSets)} · ${formatWeightWithUnit(pe.workingWeight, pe.weightUnit)}`)))),
           ),
@@ -190,7 +190,7 @@ export async function renderWorkout(root, { db }) {
           h('a', { class: 'text-link', href: `#/progress/workout/${data.session.id}` }, 'View this workout in your history'),
         ),
         await progressionSection(data.session.id),
-        h('ul', { class: 'ex-list' }, ...data.exercises.map(exerciseLink)),
+        h('ul', { class: 'ex-list ex-list--grouped' }, ...data.exercises.map(exerciseLink)),
       );
       return;
     }
@@ -203,7 +203,7 @@ export async function renderWorkout(root, { db }) {
       widgets.bar.element,
       session.pausedAt !== null ? h('p', { class: 'notice notice--paused', role: 'status' }, 'Paused. Resume to keep logging.') : null,
       h('p', { class: 'muted' }, `${session.dayName} · ${exercises.filter((e) => e.status === 'completed').length} / ${exercises.length} exercises done`),
-      h('ul', { class: 'ex-list' }, ...exercises.map(exerciseLink)),
+      h('ul', { class: 'ex-list ex-list--grouped' }, ...exercises.map(exerciseLink)),
       h(
         'div',
         { class: 'workout-actions' },

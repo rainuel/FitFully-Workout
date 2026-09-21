@@ -94,6 +94,7 @@ export async function renderWorkoutExercise(root, { db, params, navigate }) {
           if (!result?.ok) return;
           await refresh();
           if (wantDone && result.workoutComplete) showToast('All sets done. Finish your workout when you’re ready.');
+          else if (wantDone && result.breakSeconds > 0) showToast(`Exercise complete. Take a ${result.breakSeconds / 60} min break before the next one.`);
           else if (wantDone && result.exerciseCompleted) showToast('Exercise complete');
         },
       }),

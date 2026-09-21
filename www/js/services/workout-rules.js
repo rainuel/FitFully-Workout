@@ -9,6 +9,20 @@ import { formatRepTarget, formatWeight } from '../utils/format.js';
 
 export const REST_MAX_MS = 15 * 60 * 1000;
 export const REST_STEP_MS = 15 * 1000;
+
+// The longer break after finishing all the sets of an exercise, before the next one.
+export const BREAK_OPTIONS = [
+  { seconds: 0, label: 'Off' },
+  { seconds: 5 * 60, label: '5 min' },
+  { seconds: 10 * 60, label: '10 min' },
+];
+export const DEFAULT_BREAK_SECONDS = 5 * 60;
+
+/** Anything that isn't one of the offered choices falls back to the default. */
+export function normalizeBreakSeconds(value) {
+  const n = Number(value);
+  return BREAK_OPTIONS.some((o) => o.seconds === n) ? n : DEFAULT_BREAK_SECONDS;
+}
 // A finished rest that nobody dismissed stops being shown after this long.
 export const REST_STALE_MS = 2 * 60 * 1000;
 

@@ -13,7 +13,8 @@ import { isoWeekday, toLocalDateString } from '../utils/dates.js';
 import * as W from '../models/workout.js';
 import { loadWeek } from './schedule-service.js';
 import { getProgramDefaults, loadDayEditor } from './program-service.js';
-import { REST_MAX_MS, validateSetEntry } from './workout-rules.js';
+import { DEFAULT_BREAK_SECONDS, REST_MAX_MS, normalizeBreakSeconds, validateSetEntry } from './workout-rules.js';
+import { getSetting, setSetting } from '../models/settings.js';
 import { clamp } from './program-rules.js';
 import { assessExercise, recordSessionProgression } from './progression-service.js';
 
@@ -186,15 +187,22 @@ export async function completeSet(db, setId, { weight, reps }, nowMs = Date.now(
     const remaining = await W.countIncompleteWorkingSets(tx, session.id);
 
     let restStarted = false;
+    let breakSeconds = 0;
     if (set.kind === 'working') {
       if (remaining > 0) {
-        await W.setRestEndsAt(tx, session.id, nowMs + (header.restSeconds ?? 90) * 1000);
+        // Finished every set of this exercise and there is more to do: take the longer
+        // break (5 or 10 min, or none if the user turned it off) instead of the short rest.
+        if (status === 'completed') {
+          breakSeconds = normalizeBreakSeconds(await getSetting(tx, EXERCISE_BREAK_KEY, DEFAULT_BREAK_SECONDS));
+        }
+        const restSeconds = breakSeconds > 0 ? breakSeconds : (header.restSeconds ?? 90);
+        await W.setRestEndsAt(tx, session.id, nowMs + restSeconds * 1000);
         restStarted = true;
       } else {
         await W.setRestEndsAt(tx, session.id, null);
       }
     }
-    return { ok: true, restStarted, exerciseCompleted: status === 'completed', workoutComplete: remaining === 0 };
+    return { ok: true, restStarted, breakSeconds, exerciseCompleted: status === 'completed', workoutComplete: remaining === 0 };
   });
 }
 
@@ -258,6 +266,22 @@ export async function removeSet(db, setId) {
     await refreshExercise(tx, exercise.id, session.id);
     return { ok: true };
   });
+}
+
+// ---- Break between exercises -------------------------------------------------
+
+const EXERCISE_BREAK_KEY = 'exercise_break_seconds';
+
+/** The break taken after finishing an exercise: 0 (off), 300 or 600 seconds. */
+export async function getExerciseBreakSeconds(db) {
+  return normalizeBreakSeconds(await getSetting(db, EXERCISE_BREAK_KEY, DEFAULT_BREAK_SECONDS));
+}
+
+export async function saveExerciseBreakSeconds(db, seconds) {
+  const n = Number(seconds);
+  if (normalizeBreakSeconds(n) !== n) return { ok: false, errors: ['Choose Off, 5 min or 10 min.'] };
+  await setSetting(db, EXERCISE_BREAK_KEY, n);
+  return { ok: true, value: n };
 }
 
 // ---- Rest timer -------------------------------------------------------------
