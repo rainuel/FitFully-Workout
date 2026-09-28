@@ -1,4 +1,5 @@
 import { h, pluralize } from '../utils/dom.js';
+import { icon } from '../components/icons.js';
 import { formatLongDate } from '../utils/dates.js';
 import { loadHomeConsistency } from '../services/streak-service.js';
 import { getActiveSession } from '../services/workout-service.js';
@@ -37,7 +38,13 @@ export async function renderHome(root, { db }) {
     ),
     today.isRest && !active
       ? restDayPanel()
-      : h('a', { class: 'btn btn--primary btn--block', href: '#/workout' }, active ? 'Continue workout' : 'Open today’s workout'),
+      : h(
+          'a',
+          { class: 'btn btn--primary btn--block cta', href: '#/workout' },
+          h('span', { class: 'cta__icon', 'aria-hidden': 'true' }, icon('dumbbell', { strokeWidth: 2.2 })),
+          h('span', { class: 'cta__text' }, h('span', { class: 'cta__title' }, active ? 'Continue workout' : 'Open today’s workout'), h('span', { class: 'cta__sub' }, active ? 'Pick up where you left off.' : 'Let’s get moving.')),
+          h('span', { class: 'cta__arrow', 'aria-hidden': 'true' }, icon('chevron', { strokeWidth: 2.6 })),
+        ),
     streakCard(message),
     weekStrip(days, { completed, scheduled }),
     ...(coach ? [coach] : []),

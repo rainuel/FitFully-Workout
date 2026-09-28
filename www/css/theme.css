@@ -1,0 +1,446 @@
+/* Fitfully theme: clean dark mode. Loaded last, so it re-skins the shared tokens
+   (colours, radius, spacing) and then restyles the Home dashboard, cards and
+   bottom navigation. CSS only: no images, no blur, no animation beyond short
+   colour/transform transitions. */
+
+:root {
+  /* Surfaces */
+  --bg: #071216;
+  --surface: #111f27;
+  --surface-raised: #15262b;
+  --surface-2: var(--surface-raised);
+
+  /* Text */
+  --text: #f5f3ea;
+  --text-muted: #9baeb5;
+  --text-dim: var(--text-muted);
+  --text-faint: #7b8f96;
+
+  /* Accent and status */
+  --accent: #ffd12f;
+  --accent-ink: #14140a;
+  --success: #3aa762;
+  --plate-green: var(--success);
+  --plate-yellow: var(--accent);
+  --on-accent-soft: rgba(7, 18, 22, 0.14);
+
+  /* Borders: blue-gray at very low opacity */
+  --border: rgba(155, 174, 181, 0.16);
+  --line: var(--border);
+
+  /* Shape and spacing */
+  --radius-card: 24px;
+  --radius-lg: var(--radius-card);
+  --radius-md: 16px;
+  --spacing: 16px;
+  --gutter: 20px;
+  --nav-height: 60px;
+
+  --transition: background-color 160ms ease, transform 160ms ease, border-color 160ms ease;
+}
+
+html,
+body {
+  background: var(--bg);
+}
+
+.screen {
+  gap: var(--spacing);
+  padding-top: 20px;
+}
+
+/* ---- Cards: one shared look ---- */
+
+.panel,
+.notice,
+.streak-card,
+.coach__quote,
+.coach__tip {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.panel {
+  padding: 18px 16px 16px;
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* ---- Buttons ---- */
+
+.btn {
+  transition: var(--transition);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn--secondary {
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+@media (hover: hover) {
+  .btn--primary:hover {
+    background: color-mix(in srgb, var(--accent) 92%, var(--text));
+  }
+
+  .btn--secondary:hover {
+    border-color: var(--text-faint);
+  }
+}
+
+/* ---- Header ---- */
+
+.hero {
+  gap: 4px;
+  padding: 4px 2px 8px;
+}
+
+.hero__date {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.hero__title {
+  font-size: 44px;
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.hero__sub {
+  color: var(--text-muted);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* ---- Today's workout: the main action ---- */
+
+.cta {
+  justify-content: flex-start;
+  gap: 14px;
+  min-height: 84px;
+  padding: 14px 18px;
+  border-radius: var(--radius-card);
+  text-align: left;
+}
+
+.cta__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--on-accent-soft);
+}
+
+.cta__icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.cta__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.cta__title {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.cta__sub {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.72;
+}
+
+.cta__arrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+
+.cta__arrow svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---- Streak ---- */
+
+.streak-card {
+  gap: 14px;
+  padding: 16px 18px;
+  color: inherit;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.streak-card__icon {
+  background: var(--surface-raised);
+}
+
+.streak-card__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.streak-card__headline {
+  font-size: 19px;
+}
+
+.streak-card__sub {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.streak-card__chevron {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.streak-card__chevron svg {
+  width: 22px;
+  height: 22px;
+}
+
+.streak-card:active {
+  transform: scale(0.985);
+  border-color: var(--text-faint);
+}
+
+@media (hover: hover) {
+  .streak-card:hover {
+    border-color: var(--text-faint);
+  }
+}
+
+/* ---- This week ---- */
+
+.week {
+  padding: 18px 12px 14px;
+}
+
+.week .section-title {
+  padding: 0 4px;
+}
+
+.week__days {
+  gap: 0;
+}
+
+.week__day {
+  gap: 2px;
+  padding: 10px 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+
+.week__day.is-today {
+  border-color: var(--border);
+  background: var(--surface-raised);
+}
+
+.week__short {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.week__name {
+  font-size: 11px;
+}
+
+.week__day.is-today .week__short {
+  color: var(--accent);
+}
+
+.week__mark--completed {
+  background: var(--success);
+}
+
+.week__summary {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ---- Today's thought ---- */
+
+.coach {
+  gap: var(--spacing);
+}
+
+.coach__quote {
+  gap: 8px;
+  padding: 20px 20px 20px 22px;
+  border-left: 4px solid var(--accent);
+}
+
+.coach__quote .coach__label {
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.coach__quote-text {
+  font-size: 17px;
+  font-weight: 500;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.coach__tip {
+  gap: 6px;
+  padding: 18px 20px;
+}
+
+.coach__tip .coach__label {
+  color: var(--accent);
+  letter-spacing: 0.06em;
+}
+
+.coach__title {
+  font-size: 16px;
+}
+
+.coach__body {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.coach__note {
+  color: var(--text-faint);
+}
+
+/* ---- Bottom navigation ---- */
+
+.bottom-nav {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.bottom-nav__item {
+  gap: 2px;
+  min-height: var(--nav-height);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  transition: color 160ms ease;
+}
+
+.bottom-nav__item svg {
+  width: 24px;
+  height: 24px;
+}
+
+.bottom-nav__item[aria-current='page'],
+.bottom-nav__item[aria-current='page'] svg {
+  color: var(--accent);
+}
+
+.bottom-nav__item[aria-current='page']::before {
+  top: 0;
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+}
+
+.bottom-nav__item:active {
+  color: var(--text);
+}
+
+@media (hover: hover) {
+  .bottom-nav__item:hover {
+    color: var(--text);
+  }
+}
+
+/* ---- Small phones (320-360px) ---- */
+
+@media (max-width: 360px) {
+  :root {
+    --gutter: 14px;
+    --spacing: 14px;
+  }
+
+  .hero__title {
+    font-size: 38px;
+  }
+
+  .hero__sub {
+    font-size: 15px;
+  }
+
+  .cta {
+    gap: 12px;
+    min-height: 76px;
+    padding: 12px 14px;
+  }
+
+  .cta__icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .cta__title {
+    font-size: 16px;
+  }
+
+  .streak-card {
+    padding: 14px;
+  }
+
+  .streak-card__headline {
+    font-size: 17px;
+  }
+
+  .week {
+    padding: 16px 6px 12px;
+  }
+
+  .week .plate {
+    width: 28px;
+    height: 28px;
+  }
+
+  .week__short {
+    font-size: 12px;
+  }
+
+  .week__name {
+    font-size: 10px;
+  }
+
+  .coach__quote {
+    padding: 16px 16px 16px 18px;
+  }
+
+  .coach__quote-text {
+    font-size: 16px;
+  }
+}
+
+/* Keep the shell from ever scrolling sideways. */
+.outlet {
+  overflow-x: hidden;
+}
+
+.screen > * {
+  min-width: 0;
+}
