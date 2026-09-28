@@ -5,7 +5,7 @@ import { runMigrations } from './db/migrations.js';
 import { seedIfNeeded } from './db/seed.js';
 import { recordLaunch } from './models/settings.js';
 import { createNativeNotifier } from './services/notification-adapter.js';
-import { syncReminders, useNotifier } from './services/notification-service.js';
+import { syncReminders, syncRestAlert, useNotifier } from './services/notification-service.js';
 import { createRouter } from './router.js';
 import { createBottomNav } from './components/bottom-nav.js';
 import { h } from './utils/dom.js';
@@ -16,6 +16,7 @@ import {
   installKeyboardHandling,
   installRoutePersistence,
   readRouteToRestore,
+  watchNavHeight,
 } from './services/lifecycle-service.js';
 
 // Screens load on first visit, so the app opens with only the shell parsed.
@@ -24,6 +25,7 @@ const lazy = (load, name) => async (root, ctx) => (await load())[name](root, ctx
 const ROUTES = [
   { path: '/home', tab: 'home', render: lazy(() => import('./screens/home.js'), 'renderHome') },
   { path: '/workout', tab: 'workout', render: lazy(() => import('./screens/workout.js'), 'renderWorkout') },
+  { path: '/workout/add', tab: 'workout', render: lazy(() => import('./screens/workout-add.js'), 'renderWorkoutAdd') },
   { path: '/workout/exercise/:id', tab: 'workout', render: lazy(() => import('./screens/workout-exercise.js'), 'renderWorkoutExercise') },
   { path: '/progress', tab: 'progress', render: lazy(() => import('./screens/progress.js'), 'renderProgress') },
   { path: '/progress/history', tab: 'progress', render: lazy(() => import('./screens/history.js'), 'renderHistory') },
@@ -59,6 +61,7 @@ function mountShell(db) {
   const outlet = h('main', { class: 'outlet', id: 'outlet' });
   const nav = createBottomNav();
   root.replaceChildren(outlet, nav.element);
+  watchNavHeight(nav.element);
 
   // Cold start with no link: reopen the screen the app was on when it closed.
   if (!window.location.hash) {
@@ -84,7 +87,10 @@ function startReminders(db) {
   if (remindersStarted) return;
   remindersStarted = true;
   useNotifier(createNativeNotifier());
-  const sync = () => syncReminders(db).catch((err) => console.error('Reminder sync failed', err));
+  const sync = () => {
+    syncReminders(db).catch((err) => console.error('Reminder sync failed', err));
+    syncRestAlert(db);
+  };
   sync();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') sync();

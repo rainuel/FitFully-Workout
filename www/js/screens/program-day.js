@@ -1,11 +1,12 @@
 import { h, pluralize } from '../utils/dom.js';
 import { weekdayName } from '../utils/dates.js';
-import { loadDayEditor, reorderDayExercises, saveDay } from '../services/program-service.js';
-import { LIMITS, summarizeProgramExercise } from '../services/program-rules.js';
+import { loadDayEditor, reorderDayExercises, saveDay, saveDayStyle } from '../services/program-service.js';
+import { DAY_COLORS, DAY_ICONS, LIMITS, summarizeProgramExercise } from '../services/program-rules.js';
 import { screenHeader } from '../components/screen-header.js';
 import { panel } from '../components/panel.js';
 import { toggle } from '../components/controls.js';
 import { icon } from '../components/icons.js';
+import { plate } from '../components/plate.js';
 import { makeSortable } from '../components/sortable.js';
 import { showToast } from '../components/toast.js';
 
@@ -97,6 +98,38 @@ export async function renderProgramDay(root, { db, params }) {
     );
   }
 
+  // Icon and colour for this day (shown in the week strip, the Program list and the Workout tab).
+  function stylePanel(day) {
+    if (day.isRest) return null;
+    const save = async (next) => {
+      const result = await saveDayStyle(db, day.id, { icon: day.icon, color: day.color, ...next });
+      if (!result.ok) {
+        showToast(result.errors[0]);
+        return;
+      }
+      await paint();
+    };
+
+    const iconOption = (key, label, content) =>
+      h('button', { class: 'style-option', type: 'button', role: 'radio', 'aria-checked': String(day.icon === key), 'aria-label': label, title: label, onClick: () => save({ icon: key }) }, content);
+    const colorOption = (key, label) =>
+      h('button', { class: `swatch${key === null ? ' swatch--auto' : ''}`, type: 'button', role: 'radio', 'data-color': key, 'aria-checked': String(day.color === key), 'aria-label': label, title: label, onClick: () => save({ color: key }) }, key === null ? 'A' : null);
+
+    return panel(
+      'Icon and colour',
+      h('div', { class: 'style-preview' }, plate({ plateIndex: 2, large: true, icon: day.icon, color: day.color }), h('span', { class: 'muted' }, `How ${day.name} looks in your week`)),
+      h('p', { class: 'field__label' }, 'Icon'),
+      h(
+        'div',
+        { class: 'style-grid', role: 'radiogroup', 'aria-label': 'Day icon' },
+        iconOption(null, 'Plate (default)', plate({ plateIndex: 2 })),
+        ...DAY_ICONS.map((i) => iconOption(i.key, i.label, icon(i.key, { strokeWidth: 2.2 }))),
+      ),
+      h('p', { class: 'field__label' }, 'Colour'),
+      h('div', { class: 'style-grid', role: 'radiogroup', 'aria-label': 'Day colour' }, colorOption(null, 'Automatic'), ...DAY_COLORS.map((c) => colorOption(c.key, c.label))),
+    );
+  }
+
   function exercisesSection(day, exercises) {
     const list = h('ul', { class: 'ex-list' }, ...exercises.map(exerciseRow));
     if (exercises.length > 1) {
@@ -132,7 +165,7 @@ export async function renderProgramDay(root, { db, params }) {
     const { day, exercises } = await loadDayEditor(db, weekday);
     const settings = settingsPanel(day);
     body.replaceChildren(
-      settings,
+      ...[settings, stylePanel(day)].filter(Boolean),
       day.isRest
         ? h(
             'div',

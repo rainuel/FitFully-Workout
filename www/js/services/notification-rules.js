@@ -8,6 +8,7 @@ import { isoToCapacitorWeekday, weekdayName, weekdayShort } from '../utils/dates
 
 export const REMINDER_ID_BASE = 1000;
 export const TEST_REMINDER_ID = 1099;
+export const REST_ALERT_ID = 1098;
 export const DEFAULT_REMINDER_TIME = '07:00';
 export const REMINDER_TITLE = 'Fit Fully';
 
@@ -15,6 +16,13 @@ export const REMINDER_CHANNEL = {
   id: 'workout-reminders',
   name: 'Workout reminders',
   description: 'A reminder on the days you train',
+  importance: 4,
+};
+
+export const REST_CHANNEL = {
+  id: 'rest-timer',
+  name: 'Break timer',
+  description: 'Tells you when your break between sets or exercises is over',
   importance: 4,
 };
 
@@ -47,9 +55,21 @@ export function reminderDayLabel(name) {
   return /\bday$/i.test(trimmed) ? trimmed : `${trimmed} day`;
 }
 
-/** "It's Monday. Push day 💪" */
+/** "Hey, today is Monday! We’re going to do our Push workout 💪" */
 export function reminderBody(weekday, dayName) {
-  return `It’s ${weekdayName(weekday)}. ${reminderDayLabel(dayName)} 💪`;
+  const name = String(dayName ?? '').trim();
+  const what = !name ? 'workout' : /\bday$/i.test(name) ? name : `${name} workout`;
+  return `Hey, today is ${weekdayName(weekday)}! We’re going to do our ${what} 💪`;
+}
+
+/** The notification for the end of a break. `nextName` is the next unfinished exercise, if any. */
+export function buildRestAlert(nextName, at) {
+  return {
+    id: REST_ALERT_ID,
+    title: REMINDER_TITLE,
+    body: nextName ? `Break’s over. Up next: ${nextName} 💪` : 'Break’s over. Time for your next set 💪',
+    at,
+  };
 }
 
 /**

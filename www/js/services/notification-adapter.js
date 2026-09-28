@@ -5,7 +5,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { REMINDER_CHANNEL, reminderIds } from './notification-rules.js';
+import { REMINDER_CHANNEL, REST_ALERT_ID, REST_CHANNEL, reminderIds } from './notification-rules.js';
 
 function normalizePermission(display) {
   if (display === 'granted') return 'granted';
@@ -56,6 +56,23 @@ export function createNativeNotifier() {
           schedule: { on: { weekday: item.capacitorWeekday, hour: item.hour, minute: item.minute }, allowWhileIdle: true },
         })),
       });
+    },
+
+    /** One notification at `at` (epoch ms) when the break ends. Replaces any earlier one. */
+    async scheduleRestAlert({ id, title, body, at }) {
+      try {
+        await LocalNotifications.createChannel(REST_CHANNEL);
+      } catch (err) {
+        console.warn('Could not create the break channel', err);
+      }
+      await LocalNotifications.cancel({ notifications: [{ id }] });
+      await LocalNotifications.schedule({
+        notifications: [{ id, title, body, channelId: REST_CHANNEL.id, schedule: { at: new Date(at), allowWhileIdle: true } }],
+      });
+    },
+
+    async cancelRestAlert() {
+      await LocalNotifications.cancel({ notifications: [{ id: REST_ALERT_ID }] });
     },
 
     async sendTest({ id, title, body }) {

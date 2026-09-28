@@ -169,7 +169,15 @@ const migration002 = {
   ],
 };
 
-export const MIGRATIONS = [migration001, migration002];
+// Phase 4: each training day can have its own icon and colour (both optional;
+// empty means the default coloured plate).
+const migration003 = {
+  version: 3,
+  name: 'program_day_style',
+  statements: [`ALTER TABLE program_days ADD COLUMN icon TEXT`, `ALTER TABLE program_days ADD COLUMN color TEXT`],
+};
+
+export const MIGRATIONS = [migration001, migration002, migration003];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 

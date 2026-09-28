@@ -1,6 +1,6 @@
 {
   "name": "fitfully",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Fit Fully \u2014 offline Android workout tracker (vanilla JS + Capacitor + SQLite)",
   "type": "module",

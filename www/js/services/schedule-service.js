@@ -39,6 +39,8 @@ export function buildWeekView(days, now = new Date()) {
       dayId: day ? day.id : null,
       name: day ? day.name : 'Rest',
       isRest,
+      icon: day && !isRest ? (day.icon ?? null) : null,
+      color: day && !isRest ? (day.color ?? null) : null,
       exerciseCount: day ? day.exerciseCount : 0,
       plateIndex: isRest ? null : plateCounter++,
       relation,

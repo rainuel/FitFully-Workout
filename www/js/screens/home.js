@@ -5,6 +5,8 @@ import { getActiveSession } from '../services/workout-service.js';
 import { weekStrip } from '../components/week-strip.js';
 import { restDayPanel } from '../components/rest-day.js';
 import { streakCard } from '../components/streak-card.js';
+import { coachCard } from '../components/coach-card.js';
+import { loadCoachTips } from '../services/coach-service.js';
 import { announceAchievements } from '../components/achievement-toast.js';
 
 export async function renderHome(root, { db }) {
@@ -17,6 +19,13 @@ export async function renderHome(root, { db }) {
   else if (today.isRest) subline = 'No workout scheduled today.';
   else if (today.exerciseCount === 0) subline = 'No exercises in this day yet.';
   else subline = pluralize(today.exerciseCount, 'exercise');
+
+  let coach = null;
+  try {
+    coach = coachCard(await loadCoachTips(db, { isRestDay: today.isRest, now }));
+  } catch (err) {
+    console.error('Could not load coach tips', err);
+  }
 
   root.append(
     h(
@@ -31,6 +40,7 @@ export async function renderHome(root, { db }) {
       : h('a', { class: 'btn btn--primary btn--block', href: '#/workout' }, active ? 'Continue workout' : 'Open today’s workout'),
     streakCard(message),
     weekStrip(days, { completed, scheduled }),
+    ...(coach ? [coach] : []),
   );
 
   // Catches anything reached since the last look (for example a finished 4-week run).

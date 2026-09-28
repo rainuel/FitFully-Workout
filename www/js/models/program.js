@@ -11,6 +11,8 @@ function mapDay(row) {
     weekday: row.weekday, // ISO: 1 = Monday ... 7 = Sunday
     name: row.name,
     isRest: row.is_rest === 1,
+    icon: row.icon ?? null,
+    color: row.color ?? null,
     exerciseCount: row.exercise_count,
   };
 }
@@ -22,7 +24,7 @@ export async function getActiveProgram(db) {
 /** All seven days of a program, Monday first. */
 export async function getProgramDays(db, programId) {
   const rows = await db.all(
-    `SELECT d.id, d.weekday, d.name, d.is_rest,
+    `SELECT d.id, d.weekday, d.name, d.is_rest, d.icon, d.color,
             (SELECT COUNT(*) FROM program_exercises pe WHERE pe.program_day_id = d.id) AS exercise_count
        FROM program_days d
       WHERE d.program_id = ?
@@ -34,7 +36,7 @@ export async function getProgramDays(db, programId) {
 
 export async function getProgramDay(db, programId, weekday) {
   const row = await db.get(
-    `SELECT d.id, d.weekday, d.name, d.is_rest,
+    `SELECT d.id, d.weekday, d.name, d.is_rest, d.icon, d.color,
             (SELECT COUNT(*) FROM program_exercises pe WHERE pe.program_day_id = d.id) AS exercise_count
        FROM program_days d
       WHERE d.program_id = ? AND d.weekday = ?`,
@@ -45,6 +47,10 @@ export async function getProgramDay(db, programId, weekday) {
 
 export async function updateProgramDay(db, dayId, { name, isRest }) {
   await db.run('UPDATE program_days SET name = ?, is_rest = ? WHERE id = ?', [name, isRest, dayId]);
+}
+
+export async function setProgramDayStyle(db, dayId, { icon, color }) {
+  await db.run('UPDATE program_days SET icon = ?, color = ? WHERE id = ?', [icon, color, dayId]);
 }
 
 // ---- Program exercises -----------------------------------------------------

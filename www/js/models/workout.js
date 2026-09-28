@@ -330,3 +330,45 @@ export async function getExerciseHeader(db, id) {
   const row = await db.get('SELECT id, session_id, rest_seconds FROM workout_exercises WHERE id = ?', [id]);
   return row ? { id: row.id, sessionId: row.session_id, restSeconds: row.rest_seconds } : null;
 }
+
+// ---- Editing a workout in progress ------------------------------------------
+
+export async function insertWorkoutExercise(db, { sessionId, libraryId, name, targetWeight, unit, restSeconds, position }) {
+  const res = await db.run(
+    `INSERT INTO workout_exercises
+       (session_id, exercise_id, program_exercise_id, exercise_name, position, target_weight, weight_unit, rest_seconds)
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+    [sessionId, libraryId, name, position, targetWeight, unit, restSeconds],
+  );
+  return lastId(db, res, 'workout_exercises');
+}
+
+export async function deleteWorkoutExercise(db, id) {
+  await db.run('DELETE FROM workout_exercises WHERE id = ?', [id]); // sets cascade
+}
+
+/** Closes gaps in `position` (1..n) and keeps the planned-exercise count in step. */
+export async function renumberExercises(db, sessionId) {
+  const rows = await db.all('SELECT id FROM workout_exercises WHERE session_id = ? ORDER BY position, id', [sessionId]);
+  for (let i = 0; i < rows.length; i++) {
+    await db.run('UPDATE workout_exercises SET position = ? WHERE id = ?', [i + 1, rows[i].id]);
+  }
+  await db.run('UPDATE workout_sessions SET exercises_planned = ? WHERE id = ?', [rows.length, sessionId]);
+}
+
+/** Changes an exercise's unit and rewrites its target and set weights with `convert`. */
+export async function convertExerciseUnit(db, exercise, unit, convert) {
+  await db.run('UPDATE workout_exercises SET weight_unit = ?, target_weight = ? WHERE id = ?', [unit, convert(exercise.targetWeight ?? 0), exercise.id]);
+  for (const s of exercise.sets) {
+    await db.run('UPDATE workout_sets SET weight_unit = ?, target_weight = ?, weight = ? WHERE id = ?', [
+      unit,
+      convert(s.targetWeight ?? 0),
+      s.weight === null || s.weight === undefined ? null : convert(s.weight),
+      s.id,
+    ]);
+  }
+}
+
+export async function setExercisePosition(db, id, position) {
+  await db.run('UPDATE workout_exercises SET position = ? WHERE id = ?', [position, id]);
+}

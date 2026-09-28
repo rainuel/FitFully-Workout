@@ -11,6 +11,7 @@ import {
   getProgramExercise,
   insertProgramExercise,
   setExerciseOrder,
+  setProgramDayStyle,
   updateProgramDay,
   updateProgramExercise,
 } from '../models/program.js';
@@ -23,6 +24,7 @@ import {
   UNITS,
   clamp,
   validateDayInput,
+  validateDayStyle,
   validateProgramExerciseDraft,
 } from './program-rules.js';
 import { reconcileSchedule } from './streak-service.js';
@@ -79,6 +81,14 @@ export async function saveDay(db, dayId, input) {
   // Reminders follow the plan: renaming a day or making it a rest day changes them.
   syncReminders(db).catch((err) => console.error('Could not update reminders after a day change', err));
   return { ok: true };
+}
+
+/** Saves a day's icon and colour (either can be null for the default). Doesn't touch the plan itself. */
+export async function saveDayStyle(db, dayId, style) {
+  const checked = validateDayStyle(style);
+  if (!checked.ok) return checked;
+  await setProgramDayStyle(db, dayId, checked.value);
+  return { ok: true, ...checked.value };
 }
 
 /** Adds a library exercise to the end of a day with a sensible starting plan. */

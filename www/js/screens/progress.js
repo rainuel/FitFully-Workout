@@ -10,8 +10,13 @@ import { bodyweightChart, bodyweightStats } from '../components/bodyweight-chart
 import { sessionList } from '../components/session-list.js';
 import { showUnlocked } from '../components/achievement-toast.js';
 
-function stat(value, label) {
-  return h('div', { class: 'stat' }, h('span', { class: 'stat__value' }, String(value)), h('span', { class: 'stat__label' }, label));
+function stat(value, label, { flame = false, active = false } = {}) {
+  return h(
+    'div',
+    { class: `stat${flame ? ' stat--streak' : ''}${flame && active ? ' is-active' : ''}` },
+    h('span', { class: 'stat__value' }, flame ? icon('flame', { strokeWidth: 2 }) : null, String(value)),
+    h('span', { class: 'stat__label' }, label),
+  );
 }
 
 function sectionHead(title, link = null) {
@@ -91,7 +96,7 @@ export async function renderProgress(root, { db }) {
 
   root.append(
     h('h1', { class: 'screen-title' }, 'Progress'),
-    h('section', { class: 'stats', 'aria-label': 'Totals' }, stat(overview.workouts, 'Workouts'), stat(overview.currentStreak, 'Streak'), stat(overview.bestStreak, 'Best streak')),
+    h('section', { class: 'stats', 'aria-label': 'Totals' }, stat(overview.workouts, 'Workouts'), stat(overview.currentStreak, 'Streak', { flame: true, active: overview.currentStreak > 0 }), stat(overview.bestStreak, 'Best streak', { flame: true })),
   );
 
   if (overview.workouts === 0) {

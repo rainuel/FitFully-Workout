@@ -20,7 +20,7 @@ export const BACKUP_TABLES = [
   { name: 'bodyweight_records', columns: ['id', 'recorded_on', 'weight', 'unit'], orderBy: 'id' },
   { name: 'exercises', columns: ['id', 'name', 'muscle_group', 'instructions', 'notes', 'is_custom', 'is_archived'], orderBy: 'id' },
   { name: 'programs', columns: ['id', 'name', 'is_active'], orderBy: 'id' },
-  { name: 'program_days', columns: ['id', 'program_id', 'weekday', 'name', 'is_rest'], orderBy: 'id' },
+  { name: 'program_days', columns: ['id', 'program_id', 'weekday', 'name', 'is_rest', 'icon', 'color'], orderBy: 'id' },
   {
     name: 'program_exercises',
     columns: ['id', 'program_day_id', 'exercise_id', 'position', 'working_weight', 'weight_unit', 'rest_seconds', 'notes'],

@@ -15,7 +15,9 @@ import { loadWeek } from './schedule-service.js';
 import { getProgramDefaults, loadDayEditor } from './program-service.js';
 import { DEFAULT_BREAK_SECONDS, REST_MAX_MS, normalizeBreakSeconds, validateSetEntry } from './workout-rules.js';
 import { getSetting, setSetting } from '../models/settings.js';
-import { clamp } from './program-rules.js';
+import { clamp, convertWeight, UNITS, DEFAULT_REP_MAX, DEFAULT_REP_MIN, DEFAULT_WORKING_SETS } from './program-rules.js';
+import { getExercise } from '../models/exercise.js';
+import { syncRestAlert } from './notification-service.js';
 import { assessExercise, recordSessionProgression } from './progression-service.js';
 
 const FINISHED = 'This workout is already finished.';
@@ -25,6 +27,14 @@ function lockedReason(session) {
   if (!session) return 'That workout no longer exists.';
   if (session.status !== 'in_progress') return FINISHED;
   if (session.pausedAt !== null) return PAUSED;
+  return null;
+}
+
+// Editing the workout's structure (add / remove / reorder / unit) is allowed while
+// paused. Only a finished or missing workout blocks it.
+function editLockedReason(session) {
+  if (!session) return 'That workout no longer exists.';
+  if (session.status !== 'in_progress') return FINISHED;
   return null;
 }
 
@@ -170,7 +180,13 @@ export async function saveSetValues(db, setId, { weight, reps }) {
  * rest time) unless this was the last working set of the whole workout.
  * Warm-up sets never start a rest.
  */
-export async function completeSet(db, setId, { weight, reps }, nowMs = Date.now()) {
+export async function completeSet(db, setId, values, nowMs = Date.now()) {
+  const result = await completeSetNow(db, setId, values, nowMs);
+  if (result.ok) await syncRestAlert(db, nowMs);
+  return result;
+}
+
+async function completeSetNow(db, setId, { weight, reps }, nowMs) {
   const checked = validateSetEntry({ weight, reps });
   if (!checked.ok) return checked;
 
@@ -268,6 +284,133 @@ export async function removeSet(db, setId) {
   });
 }
 
+// ---- Editing the workout in progress -----------------------------------------
+// Only the current workout changes. The program and past workouts are never touched.
+
+/** Adds a library exercise to the end of the workout, starting from the weight last lifted. */
+export async function addExerciseToWorkout(db, sessionId, libraryId) {
+  return db.transaction(async (tx) => {
+    const session = await W.getSession(tx, sessionId);
+    const locked = editLockedReason(session);
+    if (locked) return { ok: false, errors: [locked] };
+    const exercise = await getExercise(tx, libraryId);
+    if (!exercise) return { ok: false, errors: ['That exercise no longer exists.'] };
+
+    const existing = await W.getSessionExercises(tx, sessionId);
+    if (existing.length >= 30) return { ok: false, errors: ['A workout can have at most 30 exercises.'] };
+
+    const defaults = await getProgramDefaults(tx);
+    const previous = await W.findPreviousPerformance(tx, { sessionId, libraryId, name: exercise.name });
+    const last = previous?.sets[previous.sets.length - 1] ?? null;
+    const weight = last?.weight ?? 0;
+    const unit = last?.unit ?? defaults.unit;
+
+    const id = await W.insertWorkoutExercise(tx, {
+      sessionId,
+      libraryId,
+      name: exercise.name,
+      targetWeight: weight,
+      unit,
+      restSeconds: defaults.restSeconds,
+      position: existing.length + 1,
+    });
+    for (let i = 1; i <= DEFAULT_WORKING_SETS; i++) {
+      await W.insertSet(tx, id, { kind: 'working', setNumber: i, repMin: DEFAULT_REP_MIN, repMax: DEFAULT_REP_MAX, targetWeight: weight, weight, reps: null, unit });
+    }
+    await W.renumberExercises(tx, sessionId);
+    await W.recountCompletedExercises(tx, sessionId);
+    return { ok: true, id };
+  });
+}
+
+/** Removes an exercise (and its sets) from the workout. The last exercise can't be removed. */
+export async function removeExerciseFromWorkout(db, workoutExerciseId) {
+  return db.transaction(async (tx) => {
+    const exercise = await W.getWorkoutExercise(tx, workoutExerciseId);
+    if (!exercise) return { ok: false, errors: ['That exercise no longer exists.'] };
+    const session = await W.getSession(tx, exercise.sessionId);
+    const locked = editLockedReason(session);
+    if (locked) return { ok: false, errors: [locked] };
+    const all = await W.getSessionExercises(tx, exercise.sessionId);
+    if (all.length <= 1) return { ok: false, errors: ['A workout needs at least one exercise. Use Discard to cancel it.'] };
+
+    await W.deleteWorkoutExercise(tx, workoutExerciseId);
+    await W.renumberExercises(tx, exercise.sessionId);
+    await W.recountCompletedExercises(tx, exercise.sessionId);
+    return { ok: true };
+  });
+}
+
+/** Moves an exercise one place up (-1) or down (+1). */
+export async function moveWorkoutExercise(db, workoutExerciseId, direction) {
+  return db.transaction(async (tx) => {
+    const exercise = await W.getWorkoutExercise(tx, workoutExerciseId);
+    if (!exercise) return { ok: false, errors: ['That exercise no longer exists.'] };
+    const session = await W.getSession(tx, exercise.sessionId);
+    const locked = editLockedReason(session);
+    if (locked) return { ok: false, errors: [locked] };
+    const all = await W.getSessionExercises(tx, exercise.sessionId);
+    const i = all.findIndex((e) => e.id === workoutExerciseId);
+    const j = i + (direction < 0 ? -1 : 1);
+    if (j < 0 || j >= all.length) return { ok: true };
+    await W.setExercisePosition(tx, all[i].id, all[j].position);
+    await W.setExercisePosition(tx, all[j].id, all[i].position);
+    return { ok: true };
+  });
+}
+
+/** Sets the order of the workout's exercises. `orderedIds` must be exactly the workout's exercises. */
+export async function reorderWorkoutExercises(db, sessionId, orderedIds) {
+  return db.transaction(async (tx) => {
+    const session = await W.getSession(tx, sessionId);
+    const locked = editLockedReason(session);
+    if (locked) return { ok: false, errors: [locked] };
+    const all = await W.getSessionExercises(tx, sessionId);
+    const known = new Set(all.map((e) => e.id));
+    const valid = orderedIds.length === known.size && new Set(orderedIds).size === orderedIds.length && orderedIds.every((id) => known.has(id));
+    if (!valid) return { ok: false, errors: ['The new order does not match this workout’s exercises.'] };
+    for (let i = 0; i < orderedIds.length; i++) await W.setExercisePosition(tx, orderedIds[i], i + 1);
+    return { ok: true };
+  });
+}
+
+/**
+ * Switches one exercise of the workout between kg and lbs, converting its target
+ * and set weights. Blocked once a set is ticked, so logged history is never rewritten.
+ */
+export async function changeWorkoutExerciseUnit(db, workoutExerciseId, unit) {
+  if (!UNITS.includes(unit)) return { ok: false, errors: ['Choose kg or lbs.'] };
+  return db.transaction(async (tx) => {
+    const exercise = await W.getWorkoutExercise(tx, workoutExerciseId);
+    if (!exercise) return { ok: false, errors: ['That exercise no longer exists.'] };
+    const session = await W.getSession(tx, exercise.sessionId);
+    const locked = editLockedReason(session);
+    if (locked) return { ok: false, errors: [locked] };
+    if (exercise.unit === unit) return { ok: true, unit };
+    if (exercise.sets.some((s) => s.completed)) return { ok: false, errors: ['Untick your finished sets before changing the unit.'] };
+    await W.convertExerciseUnit(tx, exercise, unit, (v) => convertWeight(v, exercise.unit, unit));
+    return { ok: true, unit };
+  });
+}
+
+/** Adds one more warm-up set, copying the last warm-up (or the working weight if there is none). */
+export async function addWarmupSet(db, workoutExerciseId) {
+  return db.transaction(async (tx) => {
+    const exercise = await W.getWorkoutExercise(tx, workoutExerciseId);
+    if (!exercise) return { ok: false, errors: ['That exercise no longer exists.'] };
+    const session = await W.getSession(tx, exercise.sessionId);
+    const locked = lockedReason(session);
+    if (locked) return { ok: false, errors: [locked] };
+    const warmups = exercise.sets.filter((s) => s.kind === 'warmup');
+    if (warmups.length >= 5) return { ok: false, errors: ['An exercise can have at most 5 warm-up sets.'] };
+    const last = warmups[warmups.length - 1];
+    const weight = last?.weight ?? Math.round((exercise.targetWeight ?? 0) * 0.5);
+    const reps = last?.reps ?? 10;
+    const id = await W.insertSet(tx, exercise.id, { kind: 'warmup', setNumber: warmups.length + 1, repMin: reps, repMax: reps, targetWeight: weight, weight, reps, unit: exercise.unit });
+    return { ok: true, id };
+  });
+}
+
 // ---- Break between exercises -------------------------------------------------
 
 const EXERCISE_BREAK_KEY = 'exercise_break_seconds';
@@ -287,7 +430,7 @@ export async function saveExerciseBreakSeconds(db, seconds) {
 // ---- Rest timer -------------------------------------------------------------
 
 /** Adds or removes time from the running rest (e.g. ±15 s). Clamped to 0 ... 15 min. */
-export async function adjustRest(db, sessionId, deltaMs, nowMs = Date.now()) {
+async function adjustRestNow(db, sessionId, deltaMs, nowMs = Date.now()) {
   return db.transaction(async (tx) => {
     const session = await W.getSession(tx, sessionId);
     if (session?.status !== 'in_progress' || session.restEndsAt === null) return { ok: true };
@@ -299,16 +442,28 @@ export async function adjustRest(db, sessionId, deltaMs, nowMs = Date.now()) {
   });
 }
 
+export async function adjustRest(db, ...args) {
+  const result = await adjustRestNow(db, ...args);
+  if (result?.ok) await syncRestAlert(db);
+  return result;
+}
+
 /** Ends the rest early, or dismisses a finished one. */
-export async function skipRest(db, sessionId) {
+async function skipRestNow(db, sessionId) {
   await W.setRestEndsAt(db, sessionId, null);
   return { ok: true };
+}
+
+export async function skipRest(db, ...args) {
+  const result = await skipRestNow(db, ...args);
+  if (result?.ok) await syncRestAlert(db);
+  return result;
 }
 
 // ---- Pause / resume ---------------------------------------------------------
 
 /** Freezes the workout clock and the rest timer. */
-export async function pauseWorkout(db, sessionId, nowMs = Date.now()) {
+async function pauseWorkoutNow(db, sessionId, nowMs = Date.now()) {
   return db.transaction(async (tx) => {
     const session = await W.getSession(tx, sessionId);
     if (!session) return { ok: false, errors: ['That workout no longer exists.'] };
@@ -319,8 +474,14 @@ export async function pauseWorkout(db, sessionId, nowMs = Date.now()) {
   });
 }
 
+export async function pauseWorkout(db, ...args) {
+  const result = await pauseWorkoutNow(db, ...args);
+  if (result?.ok) await syncRestAlert(db);
+  return result;
+}
+
 /** Unfreezes. Time spent paused is not counted, and a running rest continues where it stopped. */
-export async function resumeWorkout(db, sessionId, nowMs = Date.now()) {
+async function resumeWorkoutNow(db, sessionId, nowMs = Date.now()) {
   return db.transaction(async (tx) => {
     const session = await W.getSession(tx, sessionId);
     if (!session) return { ok: false, errors: ['That workout no longer exists.'] };
@@ -336,6 +497,12 @@ export async function resumeWorkout(db, sessionId, nowMs = Date.now()) {
   });
 }
 
+export async function resumeWorkout(db, ...args) {
+  const result = await resumeWorkoutNow(db, ...args);
+  if (result?.ok) await syncRestAlert(db);
+  return result;
+}
+
 // ---- Finishing --------------------------------------------------------------
 
 /**
@@ -346,7 +513,7 @@ export async function resumeWorkout(db, sessionId, nowMs = Date.now()) {
  *
  * Returns { ok, discarded, early }.
  */
-export async function finishWorkout(db, sessionId, nowMs = Date.now()) {
+async function finishWorkoutNow(db, sessionId, nowMs = Date.now()) {
   return db.transaction(async (tx) => {
     const session = await W.getSession(tx, sessionId);
     if (!session) return { ok: false, errors: ['That workout no longer exists.'] };
@@ -376,8 +543,14 @@ export async function finishWorkout(db, sessionId, nowMs = Date.now()) {
   });
 }
 
+export async function finishWorkout(db, ...args) {
+  const result = await finishWorkoutNow(db, ...args);
+  if (result?.ok) await syncRestAlert(db);
+  return result;
+}
+
 /** Throws away a workout that is still in progress (the "Discard" choice). Finished workouts can't be discarded. */
-export async function discardWorkout(db, sessionId) {
+async function discardWorkoutNow(db, sessionId) {
   return db.transaction(async (tx) => {
     const session = await W.getSession(tx, sessionId);
     if (!session) return { ok: false, errors: ['That workout no longer exists.'] };
@@ -385,4 +558,10 @@ export async function discardWorkout(db, sessionId) {
     await W.deleteSession(tx, sessionId);
     return { ok: true };
   });
+}
+
+export async function discardWorkout(db, ...args) {
+  const result = await discardWorkoutNow(db, ...args);
+  if (result?.ok) await syncRestAlert(db);
+  return result;
 }

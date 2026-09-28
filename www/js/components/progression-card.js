@@ -7,6 +7,7 @@
 
 import { h } from '../utils/dom.js';
 import { formatWeight } from '../utils/format.js';
+import { goalMessage } from '../services/progression-rules.js';
 
 const UNEVEN_SPREAD = 3; // gap between best and worst set that counts as "uneven"
 
@@ -90,7 +91,7 @@ export function progressionCard({ name, progression, onKeep, onCommit }) {
       'section',
       { class: 'progress-card', 'aria-label': `Progression for ${name}` },
       h('p', { class: 'progress-card__name' }, name),
-      h('p', null, `Keep pushing! To move up, hit ${repsLabel(targetRepMax)} on all ${totalSets} sets at ${w(planned, unit)}. Your target range is ${range} reps.`),
+      h('p', null, goalMessage({ reps: repsLabel(targetRepMax), sets: totalSets, weight: w(planned, unit), range, seed: `${name}|${sets.map((s) => s.reps).join(',')}` })),
       h(
         'ul',
         { class: 'progress-card__sets' },

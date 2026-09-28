@@ -240,3 +240,15 @@ test('evaluateProgression exposes each set and the rep range when the top was no
   assert.deepEqual(r.sets.map((s) => [s.weight, s.reps]), [[30, 8], [30, 12], [25, 7]]);
   assert.equal(r.targetRepMax, 12);
 });
+test('goal message: same facts in every variation, stable for the same seed, and varies', async () => {
+  const { GOAL_TEMPLATES, goalMessage } = await import('../www/js/services/progression-rules.js');
+  const args = { reps: '12 reps', sets: 3, weight: '30 lbs', range: '8–12' };
+  assert.ok(GOAL_TEMPLATES.length >= 5);
+  for (const t of GOAL_TEMPLATES) {
+    const text = t(args);
+    for (const fact of ['12 reps', '3', '30 lbs', '8–12']) assert.ok(text.includes(fact), `${fact} in: ${text}`);
+  }
+  assert.equal(goalMessage({ ...args, seed: 'Bench|10,9,8' }), goalMessage({ ...args, seed: 'Bench|10,9,8' }));
+  const seen = new Set(['a', 'bb', 'ccc', 'dddd', 'e|1', 'f|2', 'g|3', 'h|4'].map((seed) => goalMessage({ ...args, seed })));
+  assert.ok(seen.size > 1);
+});

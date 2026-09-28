@@ -282,6 +282,24 @@ a.wk-row:active {
   font-size: 13px;
 }
 
+/* Streak stats on Progress: flame beside the number, orange when a streak is running */
+.stat--streak .stat__value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-faint);
+}
+
+.stat--streak .stat__value svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.stat--streak.is-active .stat__value {
+  color: var(--accent);
+}
+
 /* Exercise screen */
 
 .prev-card {
@@ -409,6 +427,13 @@ a.wk-row:active {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+/* Keep Previous / Next on one line so both buttons stay the same height. */
+.exercise-nav .btn {
+  padding: 0 12px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 /* Rest timer: docked above the bottom navigation */

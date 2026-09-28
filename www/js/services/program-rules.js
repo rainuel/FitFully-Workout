@@ -6,6 +6,37 @@ import { formatRepTarget, formatRest, formatWeightWithUnit } from '../utils/form
 
 export const UNITS = ['kg', 'lbs'];
 
+// Icons and colours a training day can use. `null` means the default coloured plate / automatic colour.
+export const DAY_ICONS = [
+  { key: 'dumbbell', label: 'Dumbbell' },
+  { key: 'barbell', label: 'Barbell' },
+  { key: 'kettlebell', label: 'Kettlebell' },
+  { key: 'bolt', label: 'Bolt' },
+  { key: 'heart', label: 'Heart' },
+  { key: 'flame', label: 'Flame' },
+  { key: 'star', label: 'Star' },
+  { key: 'trophy', label: 'Trophy' },
+  { key: 'target', label: 'Target' },
+];
+export const DAY_COLORS = [
+  { key: 'red', label: 'Red' },
+  { key: 'orange', label: 'Orange' },
+  { key: 'yellow', label: 'Yellow' },
+  { key: 'green', label: 'Green' },
+  { key: 'teal', label: 'Teal' },
+  { key: 'blue', label: 'Blue' },
+  { key: 'purple', label: 'Purple' },
+  { key: 'pink', label: 'Pink' },
+  { key: 'white', label: 'White' },
+];
+
+/** Checks a day's icon and colour: each is null (default) or one of the lists above. */
+export function validateDayStyle({ icon = null, color = null } = {}) {
+  if (icon !== null && !DAY_ICONS.some((i) => i.key === icon)) return { ok: false, errors: ['Choose an icon from the list.'] };
+  if (color !== null && !DAY_COLORS.some((c) => c.key === color)) return { ok: false, errors: ['Choose a colour from the list.'] };
+  return { ok: true, value: { icon, color } };
+}
+
 export const LIMITS = {
   maxWorkingSets: 10,
   maxWarmupSets: 6,

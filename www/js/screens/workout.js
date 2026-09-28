@@ -3,6 +3,8 @@ import {
   discardWorkout,
   finishWorkout,
   loadWorkoutHome,
+  reorderWorkoutExercises,
+  removeExerciseFromWorkout,
   startWorkout,
 } from '../services/workout-service.js';
 import { commitProgression, getSessionProgression, keepWeight } from '../services/progression-service.js';
@@ -15,12 +17,15 @@ import { announceAchievements } from '../components/achievement-toast.js';
 import { restDayPanel } from '../components/rest-day.js';
 import { icon } from '../components/icons.js';
 import { confirmDialog } from '../components/modal.js';
+import { makeSortable } from '../components/sortable.js';
 import { showToast } from '../components/toast.js';
 import { progressionCard } from '../components/progression-card.js';
 import { createWorkoutWidgets } from '../components/workout-widgets.js';
 
 export async function renderWorkout(root, { db }) {
   let widgets = null;
+  let editing = false;
+  const live = h('p', { class: 'sr-only', role: 'status', 'aria-live': 'polite' });
   const stopWidgets = () => {
     widgets?.destroy();
     widgets = null;
@@ -42,7 +47,7 @@ export async function renderWorkout(root, { db }) {
     return h(
       'div',
       { class: 'today-card' },
-      plate({ plateIndex: today.plateIndex, isToday: true, large: true }),
+      plate({ plateIndex: today.plateIndex, isToday: true, large: true, icon: today.icon, color: today.color }),
       h('div', null, h('h2', { class: 'today-card__name' }, today.name), h('p', { class: 'muted' }, sub)),
     );
   }
@@ -60,6 +65,48 @@ export async function renderWorkout(root, { db }) {
         icon('chevron'),
       ),
     );
+  }
+
+  // Edit mode: drag the handle to reorder (same control as the program day), or remove exercises.
+  function editRow(ex, count) {
+    const { done } = setProgress(ex);
+    return h(
+      'li',
+      { class: 'ex-row', 'data-sort-id': ex.id },
+      h(
+        'button',
+        { class: 'drag-handle', type: 'button', 'data-sort-handle': true, 'aria-label': `Reorder ${ex.name}. Drag, or use the up and down arrow keys.` },
+        icon('grip', { strokeWidth: 3 }),
+      ),
+      h('span', { class: 'ex-row__body' }, h('span', { class: 'ex-row__name' }, ex.name), h('span', { class: 'ex-row__target' }, `${describeTargets(ex)} · ${formatWeightWithUnit(ex.targetWeight, ex.unit)}`)),
+      h('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': `Remove ${ex.name}`, disabled: count <= 1, onClick: () => removeExercise(ex, done) }, icon('close')),
+    );
+  }
+
+  function editList(sessionId, exercises) {
+    const list = h('ul', { class: 'ex-list' }, ...exercises.map((ex) => editRow(ex, exercises.length)));
+    if (exercises.length > 1) {
+      makeSortable(list, {
+        announce: (text) => { live.textContent = text; },
+        onReorder: async (ids) => {
+          const r = await act(() => reorderWorkoutExercises(db, sessionId, ids.map(Number)));
+          if (!r?.ok) await paint();
+        },
+      });
+    }
+    return list;
+  }
+
+  async function removeExercise(ex, done) {
+    const ok = await confirmDialog({
+      title: `Remove ${ex.name}?`,
+      body: done > 0 ? `Its ${pluralize(done, 'logged set')} will be deleted from this workout. Your program isn’t changed.` : 'It will be taken out of this workout. Your program isn’t changed.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    const r = await act(() => removeExerciseFromWorkout(db, ex.id));
+    if (r?.ok) await paint();
   }
 
   async function progressionSection(sessionId) {
@@ -203,7 +250,14 @@ export async function renderWorkout(root, { db }) {
       widgets.bar.element,
       session.pausedAt !== null ? h('p', { class: 'notice notice--paused', role: 'status' }, 'Paused. Resume to keep logging.') : null,
       h('p', { class: 'muted' }, `${session.dayName} · ${exercises.filter((e) => e.status === 'completed').length} / ${exercises.length} exercises done`),
-      h('ul', { class: 'ex-list ex-list--grouped' }, ...exercises.map(exerciseLink)),
+      editing ? editList(session.id, exercises) : h('ul', { class: 'ex-list ex-list--grouped' }, ...exercises.map(exerciseLink)),
+      editing && exercises.length > 1 ? h('p', { class: 'muted small' }, 'Drag the handle on the left to reorder.') : null,
+      h(
+        'div',
+        { class: 'workout-edit' },
+        editing ? h('a', { class: 'btn btn--secondary btn--block', href: '#/workout/add' }, icon('plus', { strokeWidth: 2.5 }), 'Add exercise') : null,
+        h('button', { class: 'btn btn--secondary btn--block', type: 'button', 'aria-pressed': String(editing), onClick: async () => { editing = !editing; await paint(); } }, editing ? 'Done editing' : 'Edit workout'),
+      ),
       h(
         'div',
         { class: 'workout-actions' },
@@ -211,6 +265,7 @@ export async function renderWorkout(root, { db }) {
         h('button', { class: 'btn btn--danger-outline btn--block', type: 'button', onClick: () => discard(session) }, 'Discard workout'),
       ),
       widgets.timer.element,
+      live,
     );
   }
 

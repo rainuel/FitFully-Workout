@@ -73,3 +73,31 @@ export function validateIncrement(value) {
   }
   return { ok: true, value: roundWeight(n) };
 }
+
+// ---- "Keep pushing" wording ----------------------------------------------------------
+
+/**
+ * The goal sentence on a card where the top of the rep range wasn't reached.
+ * Same facts every time, worded a few different ways. The wording is picked from
+ * `seed` (exercise name + what was lifted), so it doesn't change when the screen redraws.
+ * `reps` and `sets` are counts, `weight` is like "30 lbs", `range` is like "8–12".
+ */
+export const GOAL_TEMPLATES = [
+  ({ reps, sets, weight, range }) => `Keep pushing! To move up, hit ${reps} on all ${sets} sets at ${weight}. Your target range is ${range} reps.`,
+  ({ reps, sets, weight, range }) => `Almost there! Get ${reps} on every one of your ${sets} sets at ${weight} and you’re ready to level up. The range you’re working in is ${range} reps.`,
+  ({ reps, sets, weight, range }) => `You’re building strength. Your next goal: ${reps} on all ${sets} sets at ${weight}. Stay within ${range} reps and the weight will go up soon.`,
+  ({ reps, sets, weight, range }) => `Good effort! Reach ${reps} on each of ${sets} sets at ${weight} to earn your next weight increase. Target range: ${range} reps.`,
+  ({ reps, sets, weight, range }) => `Stay with it. Once all ${sets} sets hit ${reps} at ${weight}, you move up. Keep your reps inside ${range}.`,
+  ({ reps, sets, weight, range }) => `One step at a time. Aim for ${reps} across all ${sets} sets at ${weight}, and keep working in the ${range} rep range.`,
+];
+
+function hashSeed(seed) {
+  let hash = 0;
+  for (const ch of String(seed)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return hash;
+}
+
+export function goalMessage({ reps, sets, weight, range, seed = '' }) {
+  const template = GOAL_TEMPLATES[hashSeed(seed) % GOAL_TEMPLATES.length];
+  return template({ reps, sets, weight, range });
+}

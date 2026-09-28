@@ -10,13 +10,17 @@
 //   requestPermission()               -> same
 //   replaceReminders(items)           cancel Fit Fully's reminders, then schedule `items`
 //   cancelReminders()
+//   scheduleRestAlert({ id, title, body, at })  one notification when a break ends
+//   cancelRestAlert()
 //   sendTest({ id, title, body })     show one notification in a few seconds
 
 import { getActiveProgram, getProgramDays } from '../models/program.js';
+import { getActiveSession, getSessionExercises } from '../models/workout.js';
 import { getSetting, setSetting } from '../models/settings.js';
 import {
   DEFAULT_REMINDER_TIME,
   buildReminders,
+  buildRestAlert,
   buildTestReminder,
   describeReminderDays,
   parseReminderTime,
@@ -73,6 +77,33 @@ async function applySchedule(db) {
  */
 export function syncReminders(db) {
   return serial(() => applySchedule(db));
+}
+
+/**
+ * Makes the phone's "break is over" notification match the workout in progress:
+ * one alert at the moment the running break ends, none when there is no break,
+ * the workout is paused, or it is finished. Safe to call after any change to the
+ * rest timer. Follows the Reminders switch (and needs notification permission).
+ * Never throws.
+ */
+export function syncRestAlert(db, nowMs = Date.now()) {
+  return serial(async () => {
+    try {
+      if (!notifier?.isSupported) return { status: 'unsupported' };
+      const { enabled } = await readPrefs(db);
+      const session = enabled && (await notifier.getPermission()) === 'granted' ? await getActiveSession(db) : null;
+      if (!session || session.pausedAt !== null || session.restEndsAt === null || session.restEndsAt <= nowMs) {
+        await notifier.cancelRestAlert();
+        return { status: 'cancelled' };
+      }
+      const next = (await getSessionExercises(db, session.id)).find((e) => e.status !== 'completed');
+      await notifier.scheduleRestAlert(buildRestAlert(next?.name ?? null, session.restEndsAt));
+      return { status: 'scheduled' };
+    } catch (err) {
+      console.error('Could not update the break notification', err);
+      return { status: 'error' };
+    }
+  });
 }
 
 /** Everything the Reminders panel shows. */

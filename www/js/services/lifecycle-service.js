@@ -87,6 +87,18 @@ export function installKeyboardHandling() {
   });
 }
 
+/**
+ * Publishes the bottom navigation's real height as --nav-total (0 while it is hidden),
+ * so docked bars (rest timer) sit exactly above it on every device.
+ */
+export function watchNavHeight(nav) {
+  const root = document.documentElement;
+  const update = () => root.style.setProperty('--nav-total', `${nav.offsetHeight}px`);
+  update();
+  if (typeof ResizeObserver === 'function') new ResizeObserver(update).observe(nav);
+  window.addEventListener('resize', update);
+}
+
 // ---- Errors ---------------------------------------------------------------------
 
 /** Anything that slips past a screen's own handling becomes a short message, never a blank app. */

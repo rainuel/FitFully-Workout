@@ -38,7 +38,7 @@ export function weekStrip(week, totals = null) {
             'aria-label': `${day.weekdayName}: ${day.isRest ? 'rest day' : day.name}${day.status ? `, ${STATUS_LABEL[day.status]}` : ''}${day.relation === 'today' ? ', today' : ''}`,
             'aria-current': day.relation === 'today' ? 'date' : null,
           },
-          plate({ plateIndex: day.plateIndex, isRest: day.isRest, isToday: day.relation === 'today' }),
+          plate({ plateIndex: day.plateIndex, isRest: day.isRest, isToday: day.relation === 'today', icon: day.icon, color: day.color }),
           h('span', { class: 'week__short' }, day.short),
           h('span', { class: 'week__name' }, day.isRest ? 'Rest' : day.name),
           day.status ? statusMark(day.status) : null,

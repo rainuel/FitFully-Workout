@@ -28,7 +28,7 @@ export async function renderProgram(root, { db }) {
               class: `day-list__row${day.isRest ? ' is-rest' : ''}${day.relation === 'today' ? ' is-today' : ''}`,
               href: `#/program/day/${day.weekday}`,
             },
-            plate({ plateIndex: day.plateIndex, isRest: day.isRest, large: true }),
+            plate({ plateIndex: day.plateIndex, isRest: day.isRest, large: true, icon: day.icon, color: day.color }),
             h(
               'div',
               { class: 'day-list__text' },

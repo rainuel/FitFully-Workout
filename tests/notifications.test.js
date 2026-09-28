@@ -58,6 +58,13 @@ function fakeNotifier({ permission = 'granted', requestResult = 'granted', isSup
       fake.cancelCount += 1;
       fake.scheduled = items;
     },
+    restAlert: null,
+    async scheduleRestAlert(item) {
+      fake.restAlert = item;
+    },
+    async cancelRestAlert() {
+      fake.restAlert = null;
+    },
     async sendTest(item) {
       fake.tests.push(item);
     },
@@ -83,8 +90,8 @@ test('reminder text names the day and does not double the word "day"', () => {
   assert.equal(reminderDayLabel('Leg Day'), 'Leg Day');
   assert.equal(reminderDayLabel('  Upper  '), 'Upper day');
   assert.equal(reminderDayLabel(''), 'Workout day');
-  assert.equal(reminderBody(1, 'Push'), 'It’s Monday. Push day 💪');
-  assert.equal(reminderBody(6, 'Lower'), 'It’s Saturday. Lower day 💪');
+  assert.equal(reminderBody(1, 'Push'), 'Hey, today is Monday! We’re going to do our Push workout 💪');
+  assert.equal(reminderBody(6, 'Leg Day'), 'Hey, today is Saturday! We’re going to do our Leg Day 💪');
 });
 
 test('one reminder per training day, none on rest days, at the chosen time', () => {
@@ -95,8 +102,8 @@ test('one reminder per training day, none on rest days, at the chosen time', () 
     assert.equal(r.hour, 6);
     assert.equal(r.minute, 45);
   }
-  assert.equal(reminders[0].body, 'It’s Monday. Push day 💪');
-  assert.equal(reminders[3].body, 'It’s Friday. Upper day 💪');
+  assert.equal(reminders[0].body, 'Hey, today is Monday! We’re going to do our Push workout 💪');
+  assert.equal(reminders[3].body, 'Hey, today is Friday! We’re going to do our Upper workout 💪');
 });
 
 test('weekdays are converted to the numbering Capacitor uses (Sunday = 1)', () => {
@@ -239,7 +246,7 @@ test('editing the program updates the reminders', async () => {
   const monday = await dayIdFor(db, 1);
   assert.equal((await saveDay(db, monday, { name: 'Chest', isRest: false })).ok, true);
   await syncReminders(db); // waits for the sync saveDay started
-  assert.equal(fake.scheduled.find((r) => r.weekday === 1).body, 'It’s Monday. Chest day 💪');
+  assert.equal(fake.scheduled.find((r) => r.weekday === 1).body, 'Hey, today is Monday! We’re going to do our Chest workout 💪');
 
   // Make Wednesday a rest day.
   const wednesday = await dayIdFor(db, 3);
@@ -252,7 +259,7 @@ test('editing the program updates the reminders', async () => {
   await saveDay(db, thursday, { name: 'Arms', isRest: false });
   await syncReminders(db);
   assert.deepEqual(fake.scheduled.map((r) => r.weekday), [1, 2, 4, 5, 6]);
-  assert.equal(fake.scheduled.find((r) => r.weekday === 4).body, 'It’s Thursday. Arms day 💪');
+  assert.equal(fake.scheduled.find((r) => r.weekday === 4).body, 'Hey, today is Thursday! We’re going to do our Arms workout 💪');
 });
 
 test('editing the program while reminders are off schedules nothing', async () => {
@@ -308,3 +315,33 @@ test('a plugin failure is reported, not thrown', async () => {
 });
 
 test.after(() => useNotifier(null));
+
+test('break alert: scheduled when a break starts, cleared on skip, pause and finish', async () => {
+  const { syncRestAlert } = await import('../www/js/services/notification-service.js');
+  const { setSetting } = await import('../www/js/models/settings.js');
+  const W = await import('../www/js/services/workout-service.js');
+  const db = await setupDb();
+  const fake = fakeNotifier();
+  useNotifier(fake);
+  await setSetting(db, 'notif_enabled', '1');
+  const { planDay } = await import('./helpers/scenario.js');
+  const { isoWeekday } = await import('../www/js/utils/dates.js');
+  await planDay(db, isoWeekday(new Date()), [{ name: 'Bench Press', weight: 100 }, { name: 'Shoulder Press', weight: 60 }]);
+  const started = await W.startWorkout(db);
+  assert.equal(started.ok, true);
+  const session = started.sessionId;
+  const first = (await W.loadWorkoutHome(db)).exercises[0].sets.find((s) => s.kind === 'working');
+  const done = await W.completeSet(db, first.id, { weight: first.weight ?? 0, reps: 8 });
+  assert.equal(done.restStarted, true);
+  assert.ok(fake.restAlert, 'a break alert is scheduled');
+  assert.ok(fake.restAlert.at > Date.now());
+  assert.match(fake.restAlert.body, /Break’s over/);
+  assert.match(fake.restAlert.body, /Up next: Bench Press/);
+  await W.pauseWorkout(db, session);
+  assert.equal(fake.restAlert, null);
+  await W.resumeWorkout(db, session);
+  assert.ok(fake.restAlert);
+  await W.skipRest(db, session);
+  assert.equal(fake.restAlert, null);
+  useNotifier(null);
+});

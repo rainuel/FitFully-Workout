@@ -1,6 +1,6 @@
 import { h } from '../utils/dom.js';
 import { formatShortDate } from '../utils/dates.js';
-import { addSet, completeSet, loadExerciseScreen, removeSet, saveSetValues, uncompleteSet } from '../services/workout-service.js';
+import { addSet, addWarmupSet, changeWorkoutExerciseUnit, completeSet, loadExerciseScreen, removeSet, saveSetValues, uncompleteSet } from '../services/workout-service.js';
 import { stepForUnit } from '../services/program-rules.js';
 import { formatLoggedSet, setProgress } from '../services/workout-rules.js';
 import { commitProgression, commitWorkingWeight, getCommitOffer, keepWeight } from '../services/progression-service.js';
@@ -11,6 +11,7 @@ import { screenHeader } from '../components/screen-header.js';
 import { icon } from '../components/icons.js';
 import { announceAchievements } from '../components/achievement-toast.js';
 import { setRow } from '../components/set-row.js';
+import { field, segmented } from '../components/controls.js';
 import { showToast } from '../components/toast.js';
 import { createWorkoutWidgets } from '../components/workout-widgets.js';
 
@@ -109,6 +110,32 @@ export async function renderWorkoutExercise(root, { db, params, navigate }) {
     );
   }
 
+  // Kg / lbs for this exercise. Converts its weights; locked once a set is ticked.
+  function unitSwitch({ canEdit }) {
+    const { exercise } = data;
+    const locked = !canEdit || exercise.sets.some((s) => s.completed);
+    return h(
+      'div',
+      { class: locked ? 'is-locked' : null },
+      field(
+        'Weight unit',
+        segmented({
+          label: 'Weight unit',
+          options: [
+            { value: 'lbs', label: 'lbs' },
+            { value: 'kg', label: 'kg' },
+          ],
+          value: exercise.unit,
+          onChange: async (unit) => {
+            const r = await act(() => changeWorkoutExerciseUnit(db, id, unit));
+            if (r?.ok) await refresh();
+          },
+        }),
+        locked && canEdit ? 'Untick finished sets to change the unit.' : null,
+      ),
+    );
+  }
+
   function progressionSection() {
     const { exercise, progression } = data;
     if (exercise.status !== 'completed' && progression.state !== 'kept' && progression.state !== 'committed') return null;
@@ -201,6 +228,7 @@ export async function renderWorkoutExercise(root, { db, params, navigate }) {
       h(
         'div',
         { class: `stack${canEdit ? '' : ' is-locked'}` },
+        unitSwitch({ canEdit: inProgress }),
         setsSection('warmup', { canEdit }),
         setsSection('working', { canEdit }),
         inProgress
@@ -216,6 +244,21 @@ export async function renderWorkoutExercise(root, { db, params, navigate }) {
               },
               icon('plus', { strokeWidth: 2.5 }),
               'Add set',
+            )
+          : null,
+        inProgress
+          ? h(
+              'button',
+              {
+                class: 'btn btn--secondary btn--block',
+                type: 'button',
+                onClick: async () => {
+                  const result = await act(() => addWarmupSet(db, id));
+                  if (result?.ok) await refresh();
+                },
+              },
+              icon('plus', { strokeWidth: 2.5 }),
+              'Add warm-up set',
             )
           : null,
       ),

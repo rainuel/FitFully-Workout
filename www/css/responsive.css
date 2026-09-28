@@ -1,0 +1,136 @@
+/* Responsive fixes: small phones, short/landscape screens, docked bars.
+   Loaded last (see index.html) so it can adjust the base rules. */
+
+/* Labels never push their neighbours around. */
+.bottom-nav__item {
+  min-width: 0;
+}
+
+.bottom-nav__item span,
+.week__short,
+.week__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "Today" tag wraps under the weekday instead of running over the count. */
+.day-list__weekday {
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+/* Rest timer sits exactly on top of the real nav height (set by JS as --nav-total)
+   and respects side insets in landscape. */
+.rest-bar {
+  bottom: calc(var(--nav-total, calc(var(--nav-height) + var(--safe-bottom))) + 10px);
+  left: var(--safe-left);
+  right: var(--safe-right);
+  width: min(600px, calc(100% - 2 * var(--gutter) - var(--safe-left) - var(--safe-right)));
+}
+
+/* Narrow phones (320-360px wide) */
+@media (max-width: 360px) {
+  :root {
+    --gutter: 16px;
+  }
+
+  .screen {
+    gap: 16px;
+    padding-top: 20px;
+  }
+
+  .screen-title {
+    font-size: 28px;
+  }
+
+  .screen-header .screen-title {
+    font-size: 26px;
+  }
+
+  .bottom-nav__item {
+    font-size: 11px;
+  }
+
+  .week__name {
+    font-size: 10px;
+  }
+
+  .day-list__row {
+    gap: 10px;
+    padding: 12px;
+  }
+}
+
+/* Short screens (landscape phones): compact nav, tighter spacing */
+@media (max-height: 480px) {
+  :root:not(.kb-open) {
+    --nav-height: 48px;
+  }
+
+  .bottom-nav__item {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .screen {
+    gap: 14px;
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+
+  .screen-title {
+    font-size: 26px;
+  }
+}
+
+/* Tablets / large screens: a little more room */
+@media (min-width: 768px) {
+  .screen {
+    max-width: 720px;
+  }
+}
+
+/* ---- Editing the workout in progress ---- */
+
+.workout-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ex-list__item--edit {
+  gap: 4px;
+}
+
+.icon-btn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.icon-btn:active:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.icon-btn:disabled {
+  opacity: 0.3;
+}
+
+.icon-btn--danger {
+  color: var(--danger);
+}
+
+.icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
